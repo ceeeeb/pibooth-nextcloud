@@ -8,7 +8,7 @@ pibooth-nextcloud
 ``pibooth-nextcloud`` is a plugin for the `pibooth <https://github.com/pibooth/pibooth>`_
 application.
 
-This plugin adds the photo upload to a `Nextcloud Server>`_.
+This plugin adds the photo upload to a `Nextcloud Server`_.
 It requires an internet connection to work
 
 Install
@@ -56,7 +56,7 @@ Note
 -----
 
 
-.. |PythonVersions| image:: https://img.shields.io/badge/python-3.6+-red.svg
+.. |PythonVersions| image:: https://img.shields.io/badge/python-3.0+-red.svg
    :target: https://www.python.org/downloads
    :alt: Python 3.0+
 
