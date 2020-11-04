@@ -32,8 +32,8 @@ def main():
             'Topic :: Multimedia :: Graphics :: Capture :: Digital Camera',
         ],
         author="Ceeeeb",
-        url="https://github.com/pibooth/pibooth-nextcloud",
-        download_url="https://github.com/pibooth/pibooth-nextcloud/archive/{}.tar.gz".format(plugin.__version__),
+        url="https://github.com/ceeeeb/pibooth-nextcloud",
+        download_url="https://github.com/ceeeeb/pibooth-nextcloud/archive/{}.tar.gz".format(plugin.__version__),
         license='MIT license',
         platforms=['unix', 'linux'],
         keywords=[

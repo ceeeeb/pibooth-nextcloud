@@ -21,7 +21,7 @@ import pibooth
 
 from pibooth.utils import LOGGER
 
-__version__ = "1.0.0"
+__version__ = "0.0.1"
 
 
 ###########################################################################
