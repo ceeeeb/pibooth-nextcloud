@@ -58,7 +58,7 @@ Note
 
 .. |PythonVersions| image:: https://img.shields.io/badge/python-3.6+-red.svg
    :target: https://www.python.org/downloads
-   :alt: Python 3.6+
+   :alt: Python 3.0+
 
 .. |PypiPackage| image:: https://badge.fury.io/py/pibooth-nextcloud.svg
    :target: https://pypi.org/project/pibooth-nextcloud
