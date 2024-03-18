@@ -9,6 +9,7 @@ pibooth-nextcloud
 application.
 
 This plugin adds the photo upload to a `Nextcloud Server`_.
+It generates and displays a QR Code with the URL on the gallery.
 It requires an internet connection to work
 
 Install
@@ -46,6 +47,13 @@ configuration):
 
     # User password for nextcloud account
     pass_nextcloud = pwd_nextcloud
+
+    # Print QR Code on screen
+    printQrCode = True
+
+    # Use Nextcloudcmd for Synchronize Local et Remote directory
+    useSynchronize = True
+
 
 
 
