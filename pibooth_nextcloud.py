@@ -21,7 +21,7 @@ import pibooth
 
 from pibooth.utils import LOGGER
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 
 ###########################################################################
@@ -85,8 +85,12 @@ def pibooth_startup(app, cfg):
         app.nextcloud_link = app.nextcloud.create_share_dir(app.nextcloud.rep_photos_nextcloud , app.nextcloud.album_name)
         LOGGER.info("Create Share remote Dir (%s)...",app.nextcloud_link)
 
-        app.nextcloud_link_gallery = app.nextcloud.create_url_gallery(app.nextcloud_link)
-        LOGGER.info("Create Link Gallery (%s)...",app.nextcloud_link_gallery)
+        if app.nextcloud_link:
+            app.nextcloud_link_gallery = app.nextcloud.create_url_gallery(app.nextcloud_link)
+            LOGGER.info("Create Link Gallery (%s)...",app.nextcloud_link_gallery)
+        else:
+            LOGGER.warning("Could not create share link, using fallback")
+            app.nextcloud_link_gallery = "Share link unavailable"
     else:
         app.nextcloud_link_gallery="Not connected"
 
@@ -227,8 +231,22 @@ class NextcloudUpload(object):
 
         LOGGER.info("Nextcloud Create Share Link   (%s)", self.rep_photos_nextcloud + album_name)
 
-        link_info = self.oc.share_file_with_link(self.rep_photos_nextcloud + album_name, public_upload=False )
-        return link_info.get_link()
+        # Check if share already exists
+        try:
+            existing_shares = self.oc.get_shares(self.rep_photos_nextcloud + album_name)
+            if existing_shares:
+                LOGGER.info("Share Link Already Exists (%s)", self.rep_photos_nextcloud + album_name)
+                return existing_shares[0].get_link()
+        except:
+            LOGGER.info("No existing share found, creating new one")
+
+        # Create new share link
+        try:
+            link_info = self.oc.share_file_with_link(self.rep_photos_nextcloud + album_name, public_upload=False)
+            return link_info.get_link()
+        except Exception as e:
+            LOGGER.error("Failed to create share link: %s", str(e))
+            return ""
 
 
     def create_url_gallery(self, link):
