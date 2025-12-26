@@ -21,7 +21,7 @@ import pibooth
 
 from pibooth.utils import LOGGER
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 
 
 ###########################################################################
@@ -250,9 +250,9 @@ class NextcloudUpload(object):
 
 
     def create_url_gallery(self, link):
-        """Create URL for Gallery
+        """Create URL for Photos app
         """
-        return link.replace(self.nhost, self.nhost + "/apps/gallery")
+        return link.replace(self.nhost, self.nhost + "/apps/photos")
 		
     def upload_photos(self, local_source_file, album_name, activate):
         """Funtion use to upload list of photos to google album
