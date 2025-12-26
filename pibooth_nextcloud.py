@@ -21,7 +21,7 @@ import pibooth
 
 from pibooth.utils import LOGGER
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 
 ###########################################################################
@@ -61,6 +61,15 @@ def pibooth_configure(cfg):
     cfg.add_option('NEXTCLOUD', 'min_space_mb', 100,
                    "Minimum free space in MB required for upload",
                    "Min Space (MB)", "100")
+    cfg.add_option('NEXTCLOUD', 'qr_position', "top-left",
+                   "QR code position on screen (top-left, top-right, bottom-left, bottom-right, center)",
+                   "QR Position", ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'])
+    cfg.add_option('NEXTCLOUD', 'qr_size', 5,
+                   "QR code size (box_size parameter, 3-10)",
+                   "QR Size", "5")
+    cfg.add_option('NEXTCLOUD', 'qr_margin', 10,
+                   "QR code margin from screen edge in pixels",
+                   "QR Margin", "10")
 
 
 
@@ -83,6 +92,9 @@ def pibooth_startup(app, cfg):
     app.nextcloud.gallery_app = cfg.get('NEXTCLOUD', 'gallery_app')
     app.nextcloud.check_quota = cfg.getboolean('NEXTCLOUD', 'check_quota')
     app.nextcloud.min_space_mb = cfg.getint('NEXTCLOUD', 'min_space_mb')
+    app.nextcloud.qr_position = cfg.get('NEXTCLOUD', 'qr_position')
+    app.nextcloud.qr_size = cfg.getint('NEXTCLOUD', 'qr_size')
+    app.nextcloud.qr_margin = cfg.getint('NEXTCLOUD', 'qr_margin')
 
     # Track connection/quota issues for user feedback
     app.nextcloud.last_error = None
@@ -133,9 +145,12 @@ def pibooth_startup(app, cfg):
     # Create QrCode image with URL to Gallery on Nextcloud
     LOGGER.info("Create QrCode with URL Link Gallery (%s)...", app.nextcloud_link_gallery)
 
+    # Clamp qr_size between 3 and 10
+    qr_box_size = max(3, min(10, app.nextcloud.qr_size))
+
     qr = qrcode.QRCode(version=1,
                        error_correction=qrcode.constants.ERROR_CORRECT_L,
-                       box_size=5,
+                       box_size=qr_box_size,
                        border=2)
     qr.add_data(app.nextcloud_link_gallery)
     qr.make(fit=True)
@@ -143,6 +158,8 @@ def pibooth_startup(app, cfg):
     image.save(app.nextcloud.local_rep + '/QRCODE.png', "PNG")
 
     app.nextcloud.qr_image = pygame.image.fromstring(image.tobytes(), image.size, image.mode)
+    LOGGER.info("QR code created with size=%d, position=%s, margin=%d",
+                qr_box_size, app.nextcloud.qr_position, app.nextcloud.qr_margin)
 
 
 
@@ -154,12 +171,30 @@ def state_wait_enter(cfg, app, win):
     :param win: graphical window instance
     """
     LOGGER.info("In state_wait_enter (%s)", app.previous_picture_file)
-    """
-    Display the QR Code
-    """
+
+    # Display the QR Code at configured position
     win_rect = win.get_rect()
     qr_rect = app.nextcloud.qr_image.get_rect()
-    win.surface.blit(app.nextcloud.qr_image, (10, 10))
+
+    margin = app.nextcloud.qr_margin
+    position = app.nextcloud.qr_position
+
+    # Calculate position based on configuration
+    if position == "top-left":
+        x, y = margin, margin
+    elif position == "top-right":
+        x, y = win_rect.width - qr_rect.width - margin, margin
+    elif position == "bottom-left":
+        x, y = margin, win_rect.height - qr_rect.height - margin
+    elif position == "bottom-right":
+        x, y = win_rect.width - qr_rect.width - margin, win_rect.height - qr_rect.height - margin
+    elif position == "center":
+        x, y = (win_rect.width - qr_rect.width) // 2, (win_rect.height - qr_rect.height) // 2
+    else:
+        # Default to top-left
+        x, y = margin, margin
+
+    win.surface.blit(app.nextcloud.qr_image, (x, y))
 
 
 
