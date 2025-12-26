@@ -23,7 +23,6 @@ from pibooth.utils import LOGGER
 
 __version__ = "1.0.1"
 
-SECTION = 'NEXTCLOUD'
 
 ###########################################################################
 # HOOK pibooth
@@ -32,30 +31,27 @@ SECTION = 'NEXTCLOUD'
 @pibooth.hookimpl
 def pibooth_configure(cfg):
     """Declare the new configuration options"""
-    cfg.add_option(SECTION, 'activate', True,
+    cfg.add_option('NEXTCLOUD', 'activate', True,
                    "Enable upload on Nextcloud",
                    "Enable upload", ['True', 'False'])
-    cfg.add_option(SECTION, 'rep_photos_nextcloud', "Photos",
+    cfg.add_option('NEXTCLOUD', 'rep_photos_nextcloud', "Photos",
                    "Path to photos directory",
                    "rep_photos_nextcloud", "Photos")
-    cfg.add_option(SECTION, 'album_name', "Pibooth",
+    cfg.add_option('NEXTCLOUD', 'album_name', "Pibooth",
                    "Album where pictures are uploaded",
                    "Album name", "Pibooth")
-    cfg.add_option(SECTION, 'host_nextcloud', '',
+    cfg.add_option('NEXTCLOUD', 'host_nextcloud', '',
                    "URL Nextcloud Server",
 		   "NextCloud URL", "https://nextcloud.localhost")	
-    cfg.add_option(SECTION, 'user_nextcloud', 'selfiebox',
+    cfg.add_option('NEXTCLOUD', 'user_nextcloud', 'selfiebox',
                    "Nextcloud User",
 		   "User Login NextCloud", "selfiebox")	
-    cfg.add_option(SECTION, 'pass_nextcloud', 'pwd123',
+    cfg.add_option('NEXTCLOUD', 'pass_nextcloud', 'pwd123',
                    "Nextcloud password",
 		   "Password NextCloud", "alpammm")
-    cfg.add_option(SECTION, 'useSynchronize', True,
+    cfg.add_option('NEXTCLOUD', 'useSynchronize', True,
                    "Use Nextcloudcmd for Synchronize Local et Remote directory",
 		   "useSynchronize", ['True', 'False'])
-    cfg.add_option(SECTION, 'printQrCode', True,
-                   "Print QR Code on screen",
-		   "printQrCode", ['True', 'False'])
 
 				   
 
@@ -67,17 +63,14 @@ def pibooth_startup(app, cfg):
     LOGGER.info("Create the NextcloudUpload Instance")
     app.nextcloud = NextcloudUpload( credentials=None)
 
-    app.nextcloud.nhost = cfg.get(SECTION, 'host_nextcloud')
-    app.nextcloud.nuser = cfg.get(SECTION, 'user_nextcloud')
-    app.nextcloud.npassword = cfg.get(SECTION, 'pass_nextcloud')
-    app.nextcloud.activate_state = cfg.getboolean(SECTION, 'activate')
-    app.nextcloud.rep_photos_nextcloud = cfg.get(SECTION, 'rep_photos_nextcloud')
-    app.nextcloud.album_name = cfg.get(SECTION, 'album_name')
-    app.nextcloud.useSynchronize = cfg.getboolean(SECTION, 'useSynchronize')
-    app.nextcloud.printQrCode = cfg.getboolean(SECTION, 'printQrCode')
+    app.nextcloud.nhost = cfg.get('NEXTCLOUD', 'host_nextcloud')
+    app.nextcloud.nuser = cfg.get('NEXTCLOUD', 'user_nextcloud')
+    app.nextcloud.npassword = cfg.get('NEXTCLOUD', 'pass_nextcloud')
+    app.nextcloud.activate_state = cfg.getboolean('NEXTCLOUD', 'activate')
+    app.nextcloud.rep_photos_nextcloud = cfg.get('NEXTCLOUD', 'rep_photos_nextcloud')
+    app.nextcloud.album_name = cfg.get('NEXTCLOUD', 'album_name')
+    app.nextcloud.useSynchronize = cfg.get('NEXTCLOUD', 'useSynchronize')
     app.nextcloud.local_rep = cfg.get('GENERAL', 'directory')
-
-    LOGGER.info("Synchronize is (%r)...",app.nextcloud.useSynchronize)
 
     app.nextcloud.wait_for_internet_connection()
     app.nextcloud.oc = app.nextcloud.login( app.nextcloud.nhost,
@@ -88,12 +81,9 @@ def pibooth_startup(app, cfg):
     LOGGER.info("Create Directory and Share")
 
     if app.nextcloud.is_connected:
-        LOGGER.info("Create Directory and Album (%s)...",app.nextcloud.album_name)
-        app.nextcloud.create_dir(app.nextcloud.rep_photos_nextcloud , app.nextcloud.album_name)
-
-        LOGGER.info("Create Share Link...")
-        app.nextcloud_link = app.nextcloud.create_share_link(app.nextcloud.rep_photos_nextcloud , app.nextcloud.album_name)
-        LOGGER.info("Share remote Link Public (%s)...",app.nextcloud_link)
+        LOGGER.info("Create Link (%s)...",app.nextcloud.album_name)
+        app.nextcloud_link = app.nextcloud.create_share_dir(app.nextcloud.rep_photos_nextcloud , app.nextcloud.album_name)
+        LOGGER.info("Create Share remote Dir (%s)...",app.nextcloud_link)
 
         app.nextcloud_link_gallery = app.nextcloud.create_url_gallery(app.nextcloud_link)
         LOGGER.info("Create Link Gallery (%s)...",app.nextcloud_link_gallery)
@@ -102,13 +92,13 @@ def pibooth_startup(app, cfg):
 
 
     # Create QrCode image with URL to Gallery on Nextcloud
-    LOGGER.info("Create QrCode with URL Link Gallery (%s)...",app.nextcloud_link)
+    LOGGER.info("Create QrCode with URL Link Gallery (%s)...",app.nextcloud_link_gallery)
 
     qr = qrcode.QRCode(version=1,
                        error_correction=qrcode.constants.ERROR_CORRECT_L,
                        box_size=5,
                        border=2)
-    qr.add_data(app.nextcloud_link)
+    qr.add_data(app.nextcloud_link_gallery)
     qr.make(fit=True)
     image = qr.make_image(fill_color="black", back_color="white").convert('RGB')
     image.save(app.nextcloud.local_rep + '/QRCODE.png' ,"PNG")
@@ -128,12 +118,11 @@ def state_wait_enter(cfg, app, win):
     """
     Display the QR Code 
     """
-    if app.nextcloud.printQrCode:
-        win_rect = win.get_rect()
-        qr_rect = app.nextcloud.qr_image.get_rect()
-        #win.surface.blit(app.nextcloud.qr_image, (win_rect.width - qr_rect.width - 10,
-        #                                   win_rect.height - qr_rect.height - 90))
-        win.surface.blit(app.nextcloud.qr_image,(10, 10))
+    win_rect = win.get_rect()
+    qr_rect = app.nextcloud.qr_image.get_rect()
+    #win.surface.blit(app.nextcloud.qr_image, (win_rect.width - qr_rect.width - 10,
+    #                                   win_rect.height - qr_rect.height - 90))
+    win.surface.blit(app.nextcloud.qr_image,(10, 10))
 
 
 
@@ -146,7 +135,7 @@ def state_processing_exit(app, cfg):
     activate_state = app.nextcloud.activate_state
     local_rep = app.nextcloud.local_rep
     
-    if app.nextcloud.useSynchronize:
+    if (app.nextcloud.useSynchronize == True):
             LOGGER.info("Synchronize Directory local to Remote  (%s)...",name)
             app.nextcloud.synchronize_pics(local_rep, rep_photos_nextcloud, nextcloud_name)
     else:
@@ -211,8 +200,8 @@ class NextcloudUpload(object):
 
         return oc
 
-    def create_dir(self, rep_photos_nextcloud, album_name):
-        """Create directory to Cloud
+    def create_share_dir(self, rep_photos_nextcloud, album_name):
+        """Create directory to Cloud and Share
         """
         if not rep_photos_nextcloud[-1] == '/':
             rep_photos_nextcloud += '/'
@@ -236,33 +225,10 @@ class NextcloudUpload(object):
         else:
             LOGGER.info("Successfully created the directory (%s) ", self.rep_photos_nextcloud + album_name)
 
-
-
-    def create_share_link(self, rep_photos_nextcloud, album_name):
-
         LOGGER.info("Nextcloud Create Share Link   (%s)", self.rep_photos_nextcloud + album_name)
 
-        try:
-            FileShare=self.oc.get_shares(self.rep_photos_nextcloud + album_name)
-        except:
-            LOGGER.warning("Problem to get_shares info for  (%s)", self.rep_photos_nextcloud + album_name)
-
-        if not FileShare:
-           LOGGER.info("No Share Link ")
-           try:
-               link_info = self.oc.share_file_with_link(self.rep_photos_nextcloud + album_name, public_upload=False )
-           except:
-               LOGGER.warning("Problem to create Share Link for  (%s)", self.rep_photos_nextcloud + album_name)
-               link=""
-           else:
-               link=link_info.get_link()
-        else:
-           LOGGER.info("Share Link Already Exist (%s) ",self.rep_photos_nextcloud + album_name)
-           """" possibility to have multiple Share link
-           """
-           for x in range(len(FileShare)):
-               link=FileShare[x].get_link()
-        return link
+        link_info = self.oc.share_file_with_link(self.rep_photos_nextcloud + album_name, public_upload=False )
+        return link_info.get_link()
 
 
     def create_url_gallery(self, link):
@@ -301,16 +267,17 @@ class NextcloudUpload(object):
     def synchronize_pics(self, local_rep, rep_photos_nextcloud, album_name):
         """ Upload Photos to Nextcloud
         """
-        if not self.is_connected:
+        if (self.is_connected == False):
             LOGGER.warning("Synchronize No internet connection")
         else:
             #Syncho repertoire nextcloud / upload
             USER_NC= self.nuser
             PASS_NC = self.npassword
             LOCAL_PATH_NC= local_rep
-            REMOTE_PATH_NC=self.nhost + "/remote.php/webdav" + rep_photos_nextcloud + album_name
-            nextcloudcmd = "nextcloudcmd" + " -u " + USER_NC + " -p " + PASS_NC + " -s  " + LOCAL_PATH_NC + " " + REMOTE_PATH_NC
-            LOGGER.info("Os Command   (%s)", nextcloudcmd)
+            REMOTE_PATH_NC=self.nhost + "/remote.php/webdav/" + rep_photos_nextcloud + "/" + album_name
+            nextcloudcmd = "nextcloudcmd" + " -u " + USER_NC + " -p " + PASS_NC + " --path " + rep_photos_nextcloud + album_name  + " -s  " + LOCAL_PATH_NC + " " + REMOTE_PATH_NC
+
             os.system(nextcloudcmd)
+
 
 
