@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import sys
+import re
 from io import open
 import os.path as osp
 from setuptools import setup
 
 
 HERE = osp.abspath(osp.dirname(__file__))
-sys.path.insert(0, HERE)
-import pibooth_nextcloud as plugin
+
+# Read version from module without importing it
+with open(osp.join(HERE, 'pibooth_nextcloud.py'), encoding='utf-8') as f:
+    content = f.read()
+    version = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content).group(1)
 
 
 def main():
     setup(
-        name=plugin.__name__,
-        version=plugin.__version__,
-        description=plugin.__doc__,
+        name='pibooth_nextcloud',
+        version=version,
+        description="Pibooth plugin to upload photos to Nextcloud",
         long_description=open(osp.join(HERE, 'README.rst'), encoding='utf-8').read(),
         long_description_content_type='text/x-rst',
         classifiers=[
@@ -33,7 +36,7 @@ def main():
         ],
         author="Ceeeeb",
         url="https://github.com/ceeeeb/pibooth-nextcloud",
-        download_url="https://github.com/ceeeeb/pibooth-nextcloud/archive/{}.tar.gz".format(plugin.__version__),
+        download_url="https://github.com/ceeeeb/pibooth-nextcloud/archive/{}.tar.gz".format(version),
         license='MIT license',
         platforms=['unix', 'linux'],
         keywords=[

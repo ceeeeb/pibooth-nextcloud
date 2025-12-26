@@ -8,7 +8,7 @@ pibooth-nextcloud
 ``pibooth-nextcloud`` is a plugin for the `pibooth <https://github.com/pibooth/pibooth>`_
 application.
 
-This plugin adds the photo upload to a `Nextcloud Server`_.
+This plugin adds the photo upload to a Nextcloud Server.
 It generates and displays a QR Code with the URL on the gallery.
 It requires an internet connection to work
 
