@@ -21,7 +21,7 @@ import pibooth
 
 from pibooth.utils import LOGGER
 
-__version__ = "1.0.6"
+__version__ = "1.0.8"
 
 
 ###########################################################################
@@ -551,19 +551,27 @@ class NextcloudUpload(object):
             LOGGER.warning("Synchronize: not connected to Nextcloud")
             return False
 
-        # Build nextcloudcmd command
-        USER_NC = self.nuser
-        PASS_NC = self.npassword
-        LOCAL_PATH_NC = local_rep
-        REMOTE_PATH_NC = self.nhost + "/remote.php/webdav/" + rep_photos_nextcloud + "/" + album_name
+        # Build remote path (ensure proper format: /Photos/AlbumName)
+        remote_path = rep_photos_nextcloud
+        if not remote_path.startswith('/'):
+            remote_path = '/' + remote_path
+        if not remote_path.endswith('/'):
+            remote_path += '/'
+        remote_path += album_name
 
+        # Build local path for the album (not the base directory!)
+        local_album_path = os.path.join(local_rep, album_name)
+
+        # Build nextcloudcmd command
+        # Format: nextcloudcmd --user USER --password PASS --path /remote/path /local/path https://server
         nextcloudcmd = (
-            f"nextcloudcmd -u {USER_NC} -p {PASS_NC} "
-            f"--path {rep_photos_nextcloud}{album_name} "
-            f"-s {LOCAL_PATH_NC} {REMOTE_PATH_NC}"
+            f"nextcloudcmd --user {self.nuser} --password {self.npassword} "
+            f"--path {remote_path} "
+            f"{local_album_path} {self.nhost}"
         )
 
         LOGGER.info("Running nextcloudcmd synchronization...")
+        LOGGER.debug("nextcloudcmd path: %s -> %s", local_album_path, remote_path)
         result = os.system(nextcloudcmd)
 
         if result != 0:
