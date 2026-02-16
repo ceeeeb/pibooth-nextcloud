@@ -48,7 +48,7 @@ def main():
         py_modules=['pibooth_nextcloud'],
         install_requires=[
             'pibooth>=2.0.0',
-            'pyocclient==0.4',
+            'pyocclient>=0.4',
             'qrcode>=6.1'
         ],
         options={
