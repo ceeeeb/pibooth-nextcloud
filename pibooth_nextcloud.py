@@ -581,15 +581,12 @@ class NextcloudUpload(object):
             remote_path += '/'
         remote_path += album_name
 
-        # Build local path for the album (not the base directory!)
-        local_album_path = os.path.join(local_rep, album_name)
-
         LOGGER.info("Running nextcloudcmd synchronization...")
-        LOGGER.debug("nextcloudcmd path: %s -> %s", local_album_path, remote_path)
+        LOGGER.debug("nextcloudcmd path: %s -> %s", local_rep, remote_path)
 
         result = subprocess.run(
             ["nextcloudcmd", "--user", self.nuser, "--password", self.npassword,
-             "--path", remote_path, local_album_path, self.nhost],
+             "--path", remote_path, local_rep, self.nhost],
             capture_output=True, text=True
         )
 
