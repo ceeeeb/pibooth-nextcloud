@@ -2,20 +2,16 @@
 
 """Pibooth plugin for Nextcloud upload."""
 
-import json
-import os.path
+import os
+import subprocess
+import threading
 
 import requests
 
-import os
-import traceback
 import owncloud
 import qrcode
 import pygame
-from PIL import Image, ImageDraw, ImageFont
-
-from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
+from PIL import Image
 
 import pibooth
 
@@ -87,7 +83,7 @@ def pibooth_startup(app, cfg):
     app.nextcloud.activate_state = cfg.getboolean('NEXTCLOUD', 'activate')
     app.nextcloud.rep_photos_nextcloud = cfg.get('NEXTCLOUD', 'rep_photos_nextcloud')
     app.nextcloud.album_name = cfg.get('NEXTCLOUD', 'album_name')
-    app.nextcloud.useSynchronize = cfg.get('NEXTCLOUD', 'useSynchronize')
+    app.nextcloud.useSynchronize = cfg.getboolean('NEXTCLOUD', 'useSynchronize')
     app.nextcloud.local_rep = cfg.get('GENERAL', 'directory')
     app.nextcloud.gallery_app = cfg.get('NEXTCLOUD', 'gallery_app')
     app.nextcloud.check_quota = cfg.getboolean('NEXTCLOUD', 'check_quota')
@@ -99,10 +95,10 @@ def pibooth_startup(app, cfg):
     # Track connection/quota issues for user feedback
     app.nextcloud.last_error = None
 
-    if not app.nextcloud.wait_for_internet_connection():
-        LOGGER.warning("No internet connection available")
+    if not app.nextcloud._check_connection():
+        LOGGER.warning("Cannot reach Nextcloud server")
         app.nextcloud.is_connected = False
-        app.nextcloud.last_error = "Pas de connexion internet"
+        app.nextcloud.last_error = "Serveur Nextcloud injoignable"
         app.nextcloud_link_gallery = "Hors ligne"
     else:
         app.nextcloud.oc = app.nextcloud.login(
@@ -200,31 +196,47 @@ def state_wait_enter(cfg, app, win):
 
 @pibooth.hookimpl
 def state_processing_exit(app, cfg):
-    """Upload picture to Nextcloud album"""
-    name = app.previous_picture_file
-    rep_photos_nextcloud = app.nextcloud.rep_photos_nextcloud
-    nextcloud_name = app.nextcloud.album_name
-    activate_state = app.nextcloud.activate_state
-    local_rep = app.nextcloud.local_rep
+    """Upload picture to Nextcloud album (non-blocking)."""
 
-    # Check quota before upload if enabled
-    if app.nextcloud.is_connected and app.nextcloud.check_quota:
-        quota_ok, quota_msg = app.nextcloud.check_disk_quota()
-        if not quota_ok:
-            LOGGER.error("Cannot upload: %s", quota_msg)
-            app.nextcloud.last_error = quota_msg
+    def _do_upload():
+        if not app.nextcloud._upload_lock.acquire(blocking=False):
+            LOGGER.warning("Upload already in progress, skipping")
             return
+        try:
+            # Reconnect if session expired
+            if not app.nextcloud._ensure_connected():
+                LOGGER.error("Cannot upload: not connected to Nextcloud")
+                return
 
-    if app.nextcloud.useSynchronize == 'True' or app.nextcloud.useSynchronize == True:
-        LOGGER.info("Synchronize Directory local to Remote (%s)...", name)
-        app.nextcloud.synchronize_pics(local_rep, rep_photos_nextcloud, nextcloud_name)
-    else:
-        LOGGER.info("Upload Photo (%s)...", name)
-        app.nextcloud.upload_photos(
-            name,
-            app.nextcloud.rep_photos_nextcloud + nextcloud_name + '/' + os.path.basename(name),
-            activate_state
-        )
+            name = app.previous_picture_file
+            rep_photos_nextcloud = app.nextcloud.rep_photos_nextcloud
+            nextcloud_name = app.nextcloud.album_name
+            activate_state = app.nextcloud.activate_state
+            local_rep = app.nextcloud.local_rep
+
+            # Check quota before upload if enabled
+            if app.nextcloud.check_quota:
+                quota_ok, quota_msg = app.nextcloud.check_disk_quota()
+                if not quota_ok:
+                    LOGGER.error("Cannot upload: %s", quota_msg)
+                    app.nextcloud.last_error = quota_msg
+                    return
+
+            if app.nextcloud.useSynchronize:
+                LOGGER.info("Synchronize Directory local to Remote (%s)...", name)
+                app.nextcloud.synchronize_pics(local_rep, rep_photos_nextcloud, nextcloud_name)
+            else:
+                LOGGER.info("Upload Photo (%s)...", name)
+                app.nextcloud.upload_photos(
+                    name,
+                    app.nextcloud.rep_photos_nextcloud + nextcloud_name + '/' + os.path.basename(name),
+                    activate_state
+                )
+        finally:
+            app.nextcloud._upload_lock.release()
+
+    thread = threading.Thread(target=_do_upload, daemon=True)
+    thread.start()
 
 
 ###########################################################################
@@ -247,25 +259,35 @@ class NextcloudUpload(object):
         self.gallery_app = "photos"
         self.check_quota = True
         self.min_space_mb = 100
+        self._upload_lock = threading.Lock()
 
-    def _is_internet(self):
-        """check internet connexion"""
-        try:
-            requests.get('https://www.google.com/', timeout=5).status_code
-            return True
-        except (requests.ConnectionError, requests.Timeout):
-            LOGGER.warning("No internet connection!!!!")
+    def _check_connection(self):
+        """Check connection to the Nextcloud server directly."""
+        for timeout in [2, 5, 10]:
+            try:
+                requests.head(self.nhost, timeout=timeout, allow_redirects=True)
+                return True
+            except (requests.ConnectionError, requests.Timeout):
+                pass
+        LOGGER.warning("Cannot reach Nextcloud server: %s", self.nhost)
+        return False
+
+    def _ensure_connected(self):
+        """Verify session is alive and reconnect if needed."""
+        if self.is_connected:
+            try:
+                self.oc.list('/')
+                return True
+            except Exception:
+                LOGGER.warning("Nextcloud session lost, attempting reconnection...")
+                self.is_connected = False
+
+        if not self._check_connection():
+            self.last_error = "Serveur Nextcloud injoignable"
             return False
 
-    def wait_for_internet_connection(self):
-        req = Request("http://google.com/")
-        for timeout in [1, 5, 10, 15]:
-            try:
-                response = urlopen(req, timeout=timeout)
-                return True
-            except URLError as err:
-                pass
-        return False
+        self.login(self.nhost, self.nuser, self.npassword)
+        return self.is_connected
 
     def login(self, nhost, nuser, npassword):
         """Perform actions when state is activated
@@ -505,10 +527,10 @@ class NextcloudUpload(object):
             self.last_error = "Non connecte"
             return False
 
-        # Check internet connection
-        if not self._is_internet():
-            LOGGER.error("Interrupt upload: no internet connection")
-            self.last_error = "Pas de connexion internet"
+        # Check connection to Nextcloud server
+        if not self._check_connection():
+            LOGGER.error("Interrupt upload: cannot reach Nextcloud server")
+            self.last_error = "Serveur Nextcloud injoignable"
             return False
 
         # Check if plugin is disabled
@@ -562,20 +584,19 @@ class NextcloudUpload(object):
         # Build local path for the album (not the base directory!)
         local_album_path = os.path.join(local_rep, album_name)
 
-        # Build nextcloudcmd command
-        # Format: nextcloudcmd --user USER --password PASS --path /remote/path /local/path https://server
-        nextcloudcmd = (
-            f"nextcloudcmd --user {self.nuser} --password {self.npassword} "
-            f"--path {remote_path} "
-            f"{local_album_path} {self.nhost}"
-        )
-
         LOGGER.info("Running nextcloudcmd synchronization...")
         LOGGER.debug("nextcloudcmd path: %s -> %s", local_album_path, remote_path)
-        result = os.system(nextcloudcmd)
 
-        if result != 0:
-            LOGGER.warning("nextcloudcmd returned non-zero exit code: %s", result)
+        result = subprocess.run(
+            ["nextcloudcmd", "--user", self.nuser, "--password", self.npassword,
+             "--path", remote_path, local_album_path, self.nhost],
+            capture_output=True, text=True
+        )
+
+        if result.returncode != 0:
+            LOGGER.warning("nextcloudcmd returned non-zero exit code: %s", result.returncode)
+            if result.stderr:
+                LOGGER.warning("nextcloudcmd stderr: %s", result.stderr.strip())
             self.last_error = "Erreur synchronisation"
             return False
 
