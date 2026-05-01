@@ -17,7 +17,7 @@ import pibooth
 
 from pibooth.utils import LOGGER
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 
 ###########################################################################
@@ -66,6 +66,9 @@ def pibooth_configure(cfg):
     cfg.add_option('NEXTCLOUD', 'qr_margin', 10,
                    "QR code margin from screen edge in pixels",
                    "QR Margin", "10")
+    cfg.add_option('NEXTCLOUD', 'printQrCode', True,
+                   "Print QR Code on screen",
+                   "Print QR Code", ['True', 'False'])
 
 
 
@@ -91,6 +94,7 @@ def pibooth_startup(app, cfg):
     app.nextcloud.qr_position = cfg.get('NEXTCLOUD', 'qr_position')
     app.nextcloud.qr_size = cfg.getint('NEXTCLOUD', 'qr_size')
     app.nextcloud.qr_margin = cfg.getint('NEXTCLOUD', 'qr_margin')
+    app.nextcloud.printQrCode = cfg.getboolean('NEXTCLOUD', 'printQrCode')
 
     # Track connection/quota issues for user feedback
     app.nextcloud.last_error = None
@@ -167,6 +171,10 @@ def state_wait_enter(cfg, app, win):
     :param win: graphical window instance
     """
     LOGGER.info("In state_wait_enter (%s)", app.previous_picture_file)
+
+    if not getattr(app.nextcloud, 'printQrCode', True):
+        return
+
 
     # Display the QR Code at configured position
     win_rect = win.get_rect()
