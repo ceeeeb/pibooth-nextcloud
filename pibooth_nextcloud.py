@@ -87,7 +87,8 @@ def pibooth_startup(app, cfg):
     app.nextcloud.rep_photos_nextcloud = cfg.get('NEXTCLOUD', 'rep_photos_nextcloud')
     app.nextcloud.album_name = cfg.get('NEXTCLOUD', 'album_name')
     app.nextcloud.useSynchronize = cfg.getboolean('NEXTCLOUD', 'useSynchronize')
-    app.nextcloud.local_rep = cfg.get('GENERAL', 'directory')
+    # First save directory, with '~' expanded as pibooth does
+    app.nextcloud.local_rep = cfg.gettuple('GENERAL', 'directory', 'path')[0]
     app.nextcloud.gallery_app = cfg.get('NEXTCLOUD', 'gallery_app')
     app.nextcloud.check_quota = cfg.getboolean('NEXTCLOUD', 'check_quota')
     app.nextcloud.min_space_mb = cfg.getint('NEXTCLOUD', 'min_space_mb')
@@ -271,12 +272,18 @@ class NextcloudUpload(object):
 
     def _check_connection(self):
         """Check connection to the Nextcloud server directly."""
+        if not self.nhost:
+            LOGGER.warning("Nextcloud server not configured (host_nextcloud is empty)")
+            return False
         for timeout in [2, 5, 10]:
             try:
                 requests.head(self.nhost, timeout=timeout, allow_redirects=True)
                 return True
             except (requests.ConnectionError, requests.Timeout):
                 pass
+            except requests.RequestException as ex:  # Malformed address, retrying is useless
+                LOGGER.warning("Invalid Nextcloud server address '%s': %s", self.nhost, ex)
+                return False
         LOGGER.warning("Cannot reach Nextcloud server: %s", self.nhost)
         return False
 
