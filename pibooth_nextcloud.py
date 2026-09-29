@@ -271,12 +271,18 @@ class NextcloudUpload(object):
 
     def _check_connection(self):
         """Check connection to the Nextcloud server directly."""
+        if not self.nhost:
+            LOGGER.warning("Nextcloud server not configured (host_nextcloud is empty)")
+            return False
         for timeout in [2, 5, 10]:
             try:
                 requests.head(self.nhost, timeout=timeout, allow_redirects=True)
                 return True
             except (requests.ConnectionError, requests.Timeout):
                 pass
+            except requests.RequestException as ex:  # Malformed address, retrying is useless
+                LOGGER.warning("Invalid Nextcloud server address '%s': %s", self.nhost, ex)
+                return False
         LOGGER.warning("Cannot reach Nextcloud server: %s", self.nhost)
         return False
 
