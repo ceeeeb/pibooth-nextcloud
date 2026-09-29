@@ -87,7 +87,8 @@ def pibooth_startup(app, cfg):
     app.nextcloud.rep_photos_nextcloud = cfg.get('NEXTCLOUD', 'rep_photos_nextcloud')
     app.nextcloud.album_name = cfg.get('NEXTCLOUD', 'album_name')
     app.nextcloud.useSynchronize = cfg.getboolean('NEXTCLOUD', 'useSynchronize')
-    app.nextcloud.local_rep = cfg.get('GENERAL', 'directory')
+    # First save directory, with '~' expanded as pibooth does
+    app.nextcloud.local_rep = cfg.gettuple('GENERAL', 'directory', 'path')[0]
     app.nextcloud.gallery_app = cfg.get('NEXTCLOUD', 'gallery_app')
     app.nextcloud.check_quota = cfg.getboolean('NEXTCLOUD', 'check_quota')
     app.nextcloud.min_space_mb = cfg.getint('NEXTCLOUD', 'min_space_mb')
