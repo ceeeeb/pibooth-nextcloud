@@ -3,6 +3,7 @@
 """Pibooth plugin for Nextcloud upload."""
 
 import os
+import shutil
 import subprocess
 import threading
 
@@ -17,7 +18,7 @@ import pibooth
 
 from pibooth.utils import LOGGER
 
-__version__ = "2.0.3"
+__version__ = "2.0.4"
 
 
 ###########################################################################
@@ -72,6 +73,17 @@ def pibooth_configure(cfg):
 
 
 
+def _use_synchronize(cfg):
+    """Return True to synchronize the album with nextcloudcmd, which is
+    not installed on every booth: without it, upload pictures one by one."""
+    if not cfg.getboolean('NEXTCLOUD', 'useSynchronize'):
+        return False
+    if shutil.which('nextcloudcmd'):
+        return True
+    LOGGER.warning("nextcloudcmd not found, pictures are uploaded one by one instead of synchronized")
+    return False
+
+
 @pibooth.hookimpl
 def pibooth_startup(app, cfg):
 
@@ -86,7 +98,7 @@ def pibooth_startup(app, cfg):
     app.nextcloud.activate_state = cfg.getboolean('NEXTCLOUD', 'activate')
     app.nextcloud.rep_photos_nextcloud = cfg.get('NEXTCLOUD', 'rep_photos_nextcloud')
     app.nextcloud.album_name = cfg.get('NEXTCLOUD', 'album_name')
-    app.nextcloud.useSynchronize = cfg.getboolean('NEXTCLOUD', 'useSynchronize')
+    app.nextcloud.useSynchronize = _use_synchronize(cfg)
     # First save directory, with '~' expanded as pibooth does
     app.nextcloud.local_rep = cfg.gettuple('GENERAL', 'directory', 'path')[0]
     app.nextcloud.gallery_app = cfg.get('NEXTCLOUD', 'gallery_app')
@@ -172,10 +184,20 @@ def state_wait_enter(cfg, app, win):
     :param win: graphical window instance
     """
     LOGGER.info("In state_wait_enter (%s)", app.previous_picture_file)
+    _draw_qr_code(app, win)
 
-    if not getattr(app.nextcloud, 'printQrCode', True):
+
+@pibooth.hookimpl
+def state_wait_do(app, win):
+    """Draw the QR code at each frame: any repaint of the wait screen (template
+    change, printer queue counter, animations) would otherwise erase it."""
+    _draw_qr_code(app, win)
+
+
+def _draw_qr_code(app, win):
+    """Draw the QR code of the gallery at its configured position."""
+    if not getattr(app.nextcloud, 'printQrCode', True) or getattr(app.nextcloud, 'qr_image', None) is None:
         return
-
 
     # Display the QR Code at configured position
     win_rect = win.get_rect()
@@ -241,6 +263,9 @@ def state_processing_exit(app, cfg):
                     app.nextcloud.rep_photos_nextcloud + nextcloud_name + '/' + os.path.basename(name),
                     activate_state
                 )
+        except Exception:  # Raised in a thread, it would otherwise vanish
+            LOGGER.exception("Nextcloud upload failed")
+            app.nextcloud.last_error = "Erreur upload"
         finally:
             app.nextcloud._upload_lock.release()
 
