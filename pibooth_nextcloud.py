@@ -184,10 +184,20 @@ def state_wait_enter(cfg, app, win):
     :param win: graphical window instance
     """
     LOGGER.info("In state_wait_enter (%s)", app.previous_picture_file)
+    _draw_qr_code(app, win)
 
-    if not getattr(app.nextcloud, 'printQrCode', True):
+
+@pibooth.hookimpl
+def state_wait_do(app, win):
+    """Draw the QR code at each frame: any repaint of the wait screen (template
+    change, printer queue counter, animations) would otherwise erase it."""
+    _draw_qr_code(app, win)
+
+
+def _draw_qr_code(app, win):
+    """Draw the QR code of the gallery at its configured position."""
+    if not getattr(app.nextcloud, 'printQrCode', True) or getattr(app.nextcloud, 'qr_image', None) is None:
         return
-
 
     # Display the QR Code at configured position
     win_rect = win.get_rect()
