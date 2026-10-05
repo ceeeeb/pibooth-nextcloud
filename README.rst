@@ -52,6 +52,7 @@ configuration):
     printQrCode = True
 
     # Use Nextcloudcmd for Synchronize Local et Remote directory
+    # (pictures are uploaded one by one when nextcloudcmd is not installed)
     useSynchronize = True
 
 
